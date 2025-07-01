@@ -1,0 +1,151 @@
+---
+title: "25-07-01-Between-t-test"
+author: "Annika Richter"
+date: "2025-07-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Within subject linear mixed model
+Monte Carlo Simulation comparing for within-subject analysis
+
+Within Subject design taking into account repeated measurements as well as dyad effects minimum sample size for 80% power = 22
+
+Next steps:
+- Take into account prompt effect
+- Take into account asymetric dyad effect (not there in human-Ai condition)
+- Test for between participant analysis
+
+Between subject fuer die Interaction
+- Code an Jona
+
+power = 0.9, effect size = 0.25 -> 250 subjects for between subject repeated ANOVA
+Webpower - R package - analytische Loesung Sample Size Estimation
+```{r}
+library(tidyverse)
+library(foreach)
+library(lmerTest)
+```
+
+```{r}
+estimate_power_lmm <- function(n_participants,
+                               effect_size = 0.25,
+                               n_trials_per_condition = 6,
+                               alpha = 0.05,
+                               n_simulations = 1000,
+                               noise_sd = 1) {
+  
+  if (n_participants %% 2 != 0) stop("n_participants must be even for dyads")
+
+  sims <- foreach(i = 1:n_simulations, .combine = c) %do% {
+    
+    # Create participant IDs
+    participant_ids <- 1:n_participants
+    dyad_ids <- rep(1:(n_participants /2), each = 2)
+    
+    # Simulate full dataset
+    df <- expand.grid(
+      participant = participant_ids,
+      condition = c("A", "B"),
+      trial = 1:n_trials_per_condition
+    ) %>%
+      mutate(
+        dyad = dyad_ids[participant],
+        condition_numeric = ifelse(condition == "B", 1, 0),
+        re_participant = rnorm(n_participants, 0, 0.5)[participant],
+        re_dyad = rnorm(n_participants / 2, 0, 0.3)[dyad],
+        error = rnorm(n(), 0, noise_sd),
+        outcome = 3 +
+          effect_size * condition_numeric +
+          re_participant +
+          re_dyad +
+          error
+      )
+    
+    # Fit LMM: random intercept per participant
+    model <- tryCatch({
+      lmer(outcome ~ condition_numeric + 
+             (1 + condition_numeric| participant) +
+             (1 | dyad), 
+           data = df)
+    }, error = function(e) return(NULL))
+    
+    if (is.null(model) || isSingular(model)) {
+      return(NA)
+    }
+    
+    # Extract p-value
+    coefs <- summary(model)$coefficients
+    if (!"condition_numeric" %in% rownames(coefs)) return(NA)
+    
+    pval <- coefs["condition_numeric", "Pr(>|t|)"]
+    return(as.integer(pval < alpha))
+  }
+  
+  power <- mean(sims, na.rm = TRUE)
+  return(power)
+}
+```
+
+```{r}
+estimate_sample_size_lmm <- function(target_power = 0.9,
+                                     effect_size = 0.4,
+                                     n_trials_per_condition = 6,
+                                     alpha = 0.05,
+                                     max_n = 200,
+                                     n_simulations = 1000,
+                                     noise_sd = 1,
+                                     verbose = TRUE) {
+  
+  results <- tibble()
+  
+  for (n in seq(150, max_n, by = 10)) {
+    if (verbose) cat("Testing n =", n, "...\n")
+    
+    power <- estimate_power_lmm(
+      n_participants = n,
+      effect_size = effect_size,
+      n_trials_per_condition = n_trials_per_condition,
+      alpha = alpha,
+      n_simulations = n_simulations,
+      noise_sd = noise_sd
+    )
+    
+    results <- bind_rows(results, tibble(n = n, power = power))
+    
+    if (power >= target_power) {
+      if (verbose) cat("Minimum sample size for", target_power * 100, "% power:", n, "\n")
+      break
+    }
+  }
+  
+  return(results)
+}
+
+```
+```{r}
+# Estimate power at fixed n
+estimate_power_lmm(n_participants = 60, effect_size = 0.25)
+
+# Estimate power curve
+power_curve <- estimate_sample_size_lmm(effect_size = 0.25,
+                                        n_trials_per_condition = 6,
+                                        max_n = 100)
+
+```
+
+
+```{r}
+ggplot(power_curve, aes(x = n, y = power)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_hline(yintercept = 0.8, linetype = "dashed", color = "green") +
+  labs(title = "Within Subjects Analysis LMM (Monte Carlo Sample Size Estimation)",
+       x = "Number of Participants",
+       y = "Estimated Power") +
+  theme_minimal()
+
+```
+
