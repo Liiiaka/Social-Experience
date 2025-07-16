@@ -11,18 +11,18 @@ knitr::opts_chunk$set(echo = TRUE)
 ### Within subject linear mixed model
 Monte Carlo Simulation comparing for within-subject analysis
 
-Within Subject design taking into account repeated measurements as well as dyad effects minimum sample size for 80% power = 22
+Within Subject design taking into account repeated measurements as well as dyad effects minimum sample size for 90% power for an effect size of 0.25:
 
-Next steps:
+3 prompts: 130 ppt
+4 prompts: 100 ppt
+5 prompts: 80 ppt
+6 prompts: 70 ppt
+
+
+Next possible steps:
 - Take into account prompt effect
 - Take into account asymetric dyad effect (not there in human-Ai condition)
 - Test for between participant analysis
-
-Between subject fuer die Interaction
-- Code an Jona
-
-power = 0.9, effect size = 0.25 -> 250 subjects for between subject repeated ANOVA
-Webpower - R package - analytische Loesung Sample Size Estimation
 ```{r}
 library(tidyverse)
 library(foreach)
@@ -32,9 +32,9 @@ library(lmerTest)
 ```{r}
 estimate_power_lmm <- function(n_participants,
                                effect_size = 0.25,
-                               n_trials_per_condition = 6,
+                               n_trials_per_condition = 3,
                                alpha = 0.05,
-                               n_simulations = 1000,
+                               n_simulations = 10000,
                                noise_sd = 1) {
   
   if (n_participants %% 2 != 0) stop("n_participants must be even for dyads")
@@ -91,17 +91,18 @@ estimate_power_lmm <- function(n_participants,
 
 ```{r}
 estimate_sample_size_lmm <- function(target_power = 0.9,
-                                     effect_size = 0.4,
-                                     n_trials_per_condition = 6,
+                                     effect_size = 0.25,
+                                     n_trials_per_condition = 3,
                                      alpha = 0.05,
                                      max_n = 200,
-                                     n_simulations = 1000,
+                                     n_simulations = 10000,
                                      noise_sd = 1,
                                      verbose = TRUE) {
   
   results <- tibble()
   
-  for (n in seq(150, max_n, by = 10)) {
+  #for (n in seq(150, max_n, by = 10)) {
+  for (n in seq(10, max_n, by = 10)) {
     if (verbose) cat("Testing n =", n, "...\n")
     
     power <- estimate_power_lmm(
@@ -126,26 +127,13 @@ estimate_sample_size_lmm <- function(target_power = 0.9,
 
 ```
 ```{r}
-# Estimate power at fixed n
-estimate_power_lmm(n_participants = 60, effect_size = 0.25)
-
 # Estimate power curve
 power_curve <- estimate_sample_size_lmm(effect_size = 0.25,
-                                        n_trials_per_condition = 6,
-                                        max_n = 100)
+                                        n_trials_per_condition = 3,
+                                        max_n = 160)
 
 ```
 
 
-```{r}
-ggplot(power_curve, aes(x = n, y = power)) +
-  geom_line(color = "steelblue", linewidth = 1) +
-  geom_point(color = "steelblue", size = 2) +
-  geom_hline(yintercept = 0.8, linetype = "dashed", color = "green") +
-  labs(title = "Within Subjects Analysis LMM (Monte Carlo Sample Size Estimation)",
-       x = "Number of Participants",
-       y = "Estimated Power") +
-  theme_minimal()
 
-```
 
