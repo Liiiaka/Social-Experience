@@ -1,0 +1,129 @@
+---
+title: "H1_H2_H3_b"
+author: "Annika Richter"
+date: "2026-05-17"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(glmmTMB)
+```
+
+
+# Variance Tests: Hypothesis Tests for H1b, H2b, H3b
+```{r}
+# Load Interleaf data
+df <- read.csv("../../Data/df_interleaf_measures.csv")
+```
+
+```{r}
+# Flow
+# Variance Test :: Within Participant
+# Compares the difference in SD between conditions within participant
+df %>%
+  group_by(participant_ID, shared_condition_order) %>%
+  summarise(sd_flow = sd(flow_rating), .groups = "drop") %>%
+  pivot_wider(names_from = shared_condition_order, 
+              values_from = sd_flow) %>%
+  with(t.test(with_ai, without_ai, paired = TRUE))
+```
+```{r}
+# H1: Flow Model, within participant variance
+# Homoschedastic Model
+flow_variance_wb_hom <- glmmTMB(flow_rating ~ shared_condition_order + chat_number + shared_prompt_order + 
+                   (1 | participant_ID) + 
+                   (1 | dyad_ID),
+                   data = df,
+                   REML = FALSE) # Use maximum likelikehood estimation, not restricted ML
+```
+
+```{r}
+flow_variance_wb_het <- glmmTMB(
+  flow_rating ~ shared_condition_order + chat_number + shared_prompt_order + 
+    (1 | participant_ID) + 
+    (1 | dyad_ID),
+  data = df,
+  REML = FALSE,
+  dispformula = ~ shared_condition_order
+)
+```
+
+```{r}
+# Anova between homoscedastic and heteroscedastic model
+anova(flow_variance_wb_hom, flow_variance_wb_het )
+
+# Model summary
+summary(flow_variance_wb_het)
+```
+
+```{r}
+# Social Presence
+# Variance :: Within Participant
+df %>%
+  group_by(participant_ID, shared_condition_order) %>%
+  summarise(sd_social_presence = sd(social_presence_rating), .groups = "drop") %>%
+  pivot_wider(names_from = shared_condition_order, 
+              values_from = sd_social_presence) %>%
+  with(t.test(with_ai, without_ai, paired = TRUE))
+```
+
+```{r}
+# H2: Social Presence Model, within participant variance
+social_presence_variance_wb_hom <- glmmTMB(social_presence_rating ~ shared_condition_order + chat_number + shared_prompt_order + 
+                   (1 | participant_ID) + 
+                   (1 | dyad_ID),
+                   data = df,
+                   REML = FALSE)
+```
+```{r}
+social_presence_variance_wb_het <- glmmTMB(social_presence_rating ~ shared_condition_order + chat_number + shared_prompt_order + 
+                   (1 | participant_ID) + 
+                   (1 | dyad_ID),
+                   data = df,
+                   REML = FALSE,
+                   dispformula = ~ shared_condition_order # Adding the scale factor: log(σϵ2)=τ0+τ1⋅Condition
+                   )
+```
+```{r}
+anova(social_presence_variance_wb_hom, social_presence_variance_wb_het )
+summary(social_presence_variance_wb_het)
+```
+
+
+```{r}
+# Affect
+# Variance :: Within Participant
+df %>%
+  group_by(participant_ID, shared_condition_order) %>%
+  summarise(sd_panas = sd(panas_rating), .groups = "drop") %>%
+  pivot_wider(names_from = shared_condition_order, 
+              values_from = sd_panas) %>%
+  with(t.test(with_ai, without_ai, paired = TRUE))
+```
+
+```{r}
+# H3: Affect Model, within participant variance
+panas_variance_wb_hom <- glmmTMB(panas_rating ~ shared_condition_order + chat_number + shared_prompt_order + 
+                   (1 | participant_ID) + 
+                   (1 | dyad_ID),
+                   data = df,
+                   REML = FALSE)
+```
+```{r}
+panas_variance_wb_het <- glmmTMB(panas_rating ~ shared_condition_order + chat_number + shared_prompt_order + 
+                   (1 | participant_ID) + 
+                   (1 | dyad_ID),
+                   data = df,
+                   REML = FALSE,
+                   dispformula = ~ shared_condition_order # Adding the scale factor: log(σϵ2)=τ0+τ1⋅Condition
+                   )
+```
+```{r}
+anova(panas_variance_wb_hom, panas_variance_wb_het )
+summary(panas_variance_wb_het)
+```
