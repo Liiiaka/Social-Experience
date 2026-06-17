@@ -1,0 +1,158 @@
+---
+title: "H6_Developement_Over_Time"
+author: "Annika Richter"
+date: "2026-05-21"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+# Load Packages
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+```
+
+
+H6: Flow will increase over time in human-human and decrease over time in human-ai condtions. 
+
+```{r}
+# Load Interleaf data
+df <- read.csv("../../Data/df_interleaf_measures.csv")
+```
+```{r}
+# Create datasets for human-human and human-ai conditions
+df_hh <- df %>% 
+  filter(shared_condition_order == "without_ai")
+
+df_hai <- df %>% 
+  filter(shared_condition_order == "with_ai")
+```
+
+
+```{r}
+# Flow human-human
+# Null Model
+flow_hh_null <- lmer(flow_rating ~ shared_prompt_order + 
+                     (1 + chat_number| participant_ID) + 
+                     (1 | dyad_ID),
+                   data = df_hh, 
+                   REML = FALSE)
+
+# Full Model
+flow_hh_full <- lmer(flow_rating ~ chat_number + shared_prompt_order + 
+                     (1 + chat_number| participant_ID) + 
+                     (1 | dyad_ID),
+                   data = df_hh, 
+                   REML = FALSE)
+
+# Compare Models
+anova(flow_hh_null, flow_hh_full)
+summary(flow_hh_full)
+```
+```{r}
+# FLow human-AI
+# Null Model
+flow_hai_null <- lmer(flow_rating ~ shared_prompt_order + 
+                     (1 + chat_number| participant_ID) + 
+                     (1 | dyad_ID),
+                   data = df_hai, 
+                   REML = FALSE)
+
+# Full Model
+flow_hai_full <- lmer(flow_rating ~ chat_number + shared_prompt_order + 
+                     (1 + chat_number| participant_ID) + 
+                     (1 | dyad_ID),
+                   data = df_hai, 
+                   REML = FALSE)
+
+# Compare Models
+anova(flow_hai_null, flow_hai_full)
+summary(flow_hai_full)
+```
+
+
+```{r}
+# Social presence human-human
+# Null Model
+social_presence_hh_null <- lmer(social_presence_rating ~ shared_prompt_order + 
+                     (1 + chat_number| participant_ID) + 
+                     (1 | dyad_ID),
+                   data = df_hh, 
+                   REML = FALSE)
+
+# Full Model
+social_presence_hh_full <- lmer(social_presence_rating ~ chat_number + shared_prompt_order + 
+                     (1 + chat_number| participant_ID) + 
+                     (1 | dyad_ID),
+                   data = df_hh, 
+                   REML = FALSE)
+
+# Compare Models
+anova(social_presence_hh_null, social_presence_hh_full)
+summary(social_presence_hh_full)
+```
+```{r}
+# Social presence human-AI
+# Null Model
+social_presence_hai_null <- lmer(social_presence_rating ~ shared_prompt_order + 
+                     (1 + chat_number| participant_ID) + 
+                     (1 | dyad_ID),
+                   data = df_hai, 
+                   REML = FALSE)
+
+# Full Model
+social_presence_hai_full <- lmer(social_presence_rating ~ chat_number + shared_prompt_order + 
+                     (1 + chat_number| participant_ID) + 
+                     (1 | dyad_ID),
+                   data = df_hai, 
+                   REML = FALSE)
+
+# Compare Models
+anova(social_presence_hai_null, social_presence_hai_full)
+summary(social_presence_hai_full)
+```
+
+
+```{r}
+# Affect human-human
+# Null Model
+affect_hh_null <- lmer(panas_rating ~ shared_prompt_order + 
+                     (1 + chat_number| participant_ID) + 
+                     (1 | dyad_ID),
+                   data = df_hh, 
+                   REML = FALSE)
+
+# Full Model
+affect_hh_full <- lmer(panas_rating ~ chat_number + shared_prompt_order + 
+                     (1 + chat_number| participant_ID) + 
+                     (1 | dyad_ID),
+                   data = df_hh, 
+                   REML = FALSE)
+
+# Compare Models
+anova(affect_hh_null, affect_hh_full)
+summary(affect_hh_full)
+```
+```{r}
+# Affect human-AI
+# Null Model
+affect_hai_null <- lmer(panas_rating ~ shared_prompt_order + 
+                     (1 + chat_number| participant_ID) + 
+                     (1 | dyad_ID),
+                   data = df_hai, 
+                   REML = FALSE)
+
+# Full Model
+affect_hai_full <- lmer(panas_rating ~ chat_number + shared_prompt_order + 
+                     (1 + chat_number| participant_ID) + 
+                     (1 | dyad_ID),
+                   data = df_hai, 
+                   REML = FALSE)
+
+# Compare Models
+anova(affect_hai_null, affect_hai_full)
+summary(affect_hai_full)
+```
