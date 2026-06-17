@@ -1,0 +1,162 @@
+---
+title: "OES_Preprocessing"
+author: "Annika Richter"
+date: "2026-05-13"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Pre-Processing for Confirmatory Analysis
+
+# 1. Preprocessing:
+- Connect to MongoDB using connection string and mongolite package
+- Extract Data from MongoDB
+
+From Database Extract 
+- Interleaf Measurements: Flow, Social Presence, Panas, Likeability, Flow Feedback, AI_Detection_Rating 
+- Participant_ID
+- Shared prompt order
+- Condition order
+
+Filter out incomplete data:
+- Keep only participants that have a complete dataset - e.g. have completed all the chats and have values in all interleaf pages
+
+```{r}
+# Load libaries
+library(mongolite)
+library(tidyverse)
+library(lubridate)
+library(tidyr)
+library(dplyr)
+```
+
+```{r}
+# Connect to MongoDB
+# Set connection string:
+connection_string <- "connection_string_to_mongo_db"
+
+# Connect to sessions data
+sessions_chatting_castellum <- mongo(collection = "good_sessions_chatting_castellum", db = "llm-flow-experience-backend", url = connection_string)
+```
+
+```{r}
+#####################################
+# Extract Interleaf Measurements
+#####################################
+# Create an interator
+it <- sessions_chatting_castellum$iterate()
+
+# Initialize empty lists for values
+interleaf_flow_list <- list()
+shared_prompt_list <- list()
+shared_condition_list <- list()
+participant_id_list <- c()
+dyad_id_list <- c()
+partner_id_list <- c()
+
+# Loop through all database documents
+while (!is.null(doc <- it$one())) {
+  # Extract interleaf_flow, prompt and condition list
+  # Interleaf_flow as name is here a little bit misleading, as it actually includes a nested list of all interleaf measures, not only flow
+  interleaf_flow_list <- append(interleaf_flow_list, list(doc$task$interleaf_flow))
+  shared_prompt_list <- append(shared_prompt_list, list(doc$task$dyad$shared_prompt_order))
+  shared_condition_list <- append(shared_condition_list, list(doc$task$dyad$shared_condition_order))
+  
+  #Extract participant_id
+  participant_id_list <- c(participant_id_list, doc$participant_id)
+  dyad_id_list <- c(dyad_id_list, doc$task$dyad$dyad_id)
+  partner_id_list <- c(partner_id_list, doc$task$dyad$partner_id)
+}
+```
+```{r}
+all_docs <- sessions_chatting_castellum$find('{}')
+```
+
+```{r}
+#####################################
+# Store into Dataframe
+#####################################
+df_prompt <- data.frame(
+  participant_ID = participant_id_list,
+  shared_prompt_order = I(shared_prompt_list)
+)
+df_condition <- data.frame(
+  participant_ID = participant_id_list,
+  shared_condition_order = I(shared_condition_list),
+  dyad_ID = dyad_id_list,
+  partner_ID = partner_id_list
+)
+
+df_interleaf_flow <- data.frame(
+  participant_ID = participant_id_list,
+  interleaf_flow = I(interleaf_flow_list)
+)
+
+head(df_prompt)
+head(df_condition)
+head(df_interleaf_flow)
+```
+
+```{r}
+df_condition_long <- df_condition %>%
+  unnest_longer(shared_condition_order) %>%    # expand list to rows
+  group_by(participant_ID) %>%                 # group by participant
+  mutate(chat_number = row_number()) %>%       # create chat number per participant
+  ungroup()     # each element of the list becomes a row
+
+df_prompt_long <- df_prompt %>%
+  unnest_longer(shared_prompt_order) %>%
+  group_by(participant_ID) %>%
+  mutate(chat_number = row_number()) %>%
+  ungroup()
+
+# Preview
+df_condition_long
+df_prompt_long
+```
+```{r}
+# Merge prompt and condition dataframes
+df_conditions <- df_prompt_long %>%
+  left_join(df_condition_long, 
+            by = c("participant_ID", "chat_number"))
+
+# Preview
+head(df_conditions)
+```
+```{r}
+df_interleaf_long <- df_interleaf_flow %>%
+  # make one row per chat
+  unnest_longer(interleaf_flow) %>%
+  
+  # spread the elements of each chat (flow, panas, etc.) into columns
+  unnest_wider(interleaf_flow) %>%
+  
+  # add chat number per participant
+  group_by(participant_ID) %>%
+  mutate(chat_number = row_number()) %>%
+  ungroup()
+
+head(df_interleaf_long)
+```
+```{r}
+df <- df_conditions %>%
+  left_join(df_interleaf_long, 
+            by = c("participant_ID", "chat_number"))
+df
+```
+```{r}
+# Keep only participants that have values
+df <- df %>%
+  group_by(participant_ID) %>%
+  filter(!any(is.na(flow_rating))) %>%
+  ungroup()
+
+# This leaves us with the full dataset including n=42
+df %>% 
+  distinct(participant_ID)
+```
+```{r}
+write.csv(df, "df_good_sessions_18_01_26.csv", row.names = FALSE)
+```

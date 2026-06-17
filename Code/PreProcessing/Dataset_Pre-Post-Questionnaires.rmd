@@ -1,0 +1,74 @@
+---
+title: "Preprocessing_Pre-Experiement-Questionnaires"
+author: "Annika Richter"
+date: "2026-05-13"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Connect to Database and extract surveys
+```{r}
+# Connect to MongoDB
+# connection_string <- "connection_string_to_mongo_db"
+
+# Connect to sessions data
+sessions_chatting_castellum <- mongo(collection = "good_sessions_chatting_castellum", db = "llm-flow-experience-backend", url = connection_string)
+```
+```{r}
+# Extract Surveys from Mongo
+it <- sessions_chatting_castellum$iterate()
+
+participant_id_list <- c()
+pre_list <- list()
+post_list <- list()
+demographics_list <- list()
+ai_usage_list <- list()
+flow_understanding_list <- list()
+
+while (!is.null(doc <- it$one())) {
+  participant_id_list <- c(participant_id_list, doc$participant_id)
+  pre_list <- append(pre_list, list(doc$surveys$pre))
+  post_list <- append(post_list, list(doc$surveys$post))
+  demographics_list <- append(demographics_list, list(doc$surveys$demographics))
+  ai_usage_list <- append(ai_usage_list, list(doc$surveys$ai_usage))
+  flow_understanding_list <- append(flow_understanding_list, list(doc$surveys$flow_understanding))
+}
+```
+
+### Demographics Questionnaire
+```{r}
+# Demographics Questionnaire
+df_demographics <- data.frame(
+  participant_ID = participant_id_list,
+  age = sapply(demographics_list, function(x) x$age),
+  gender = sapply(demographics_list, function(x) x$gender),
+  room_number = sapply(demographics_list, function(x) x$room_number)
+)
+head(df_demographics)
+```
+```{r}
+write.csv(df_demographics, "../Data/df_demographics.csv", row.names = FALSE)
+```
+
+### AI-Usage Questionnaire
+```{r}
+# AI Usage Questionnaire
+# Build AI usage dataframe
+df_ai_usage <- data.frame(
+  participant_ID = participant_id_list,
+  since = sapply(ai_usage_list, function(x) x$since),
+  frequency = sapply(ai_usage_list, function(x) x$frequency),
+  promptsPerSession = sapply(ai_usage_list, function(x) x$promptsPerSession),
+  generalOther = sapply(ai_usage_list, function(x) ifelse(is.null(x$generalOther), NA, x$generalOther)),
+  stringsAsFactors = FALSE
+)
+
+head(df_ai_usage)
+```
+```{r}
+write.csv(df_ai_usage, "../Data/df_ai_usage.csv")
+```
+
+
