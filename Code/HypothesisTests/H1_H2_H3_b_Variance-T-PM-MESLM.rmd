@@ -1,0 +1,231 @@
+---
+title: "H1_H2_H3_b_Variance-T-MESLM"
+author: "Annika Richter"
+date: "2026-06-13"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(tidyverse)
+library(PairedData)
+library(brms)
+```
+
+```{r}
+# Load Interleaf data
+df <- read.csv("../../Data/df_interleaf_measures.csv")
+```
+```{r}
+# T-Test: Within participant
+# Aggregate Data: Calculate SD per condition per participant
+df_sd <- df %>% 
+  group_by(participant_ID, shared_condition_order) %>% 
+  summarise(
+    sd_flow = sd(flow_rating),
+    sd_social_presence = sd(social_presence_rating),
+    sd_affect = sd(panas_rating),
+    .groups = "drop"
+    ) %>% 
+  pivot_wider(names_from = shared_condition_order,
+              values_from = c(sd_flow, sd_social_presence, sd_affect))
+```
+```{r}
+head(df_sd)
+```
+
+```{r}
+# T-Tests: Comparing with and without sd within participant
+t.test(df_sd$sd_flow_without_ai, df_sd$sd_flow_with_ai, paired = TRUE) # Flow
+t.test(df_sd$sd_social_presence_without_ai, df_sd$sd_social_presence_with_ai, paired = TRUE) # Social Presence
+t.test(df_sd$sd_affect_without_ai, df_sd$sd_affect_with_ai, paired = TRUE) # Affect
+
+# Why is this within participant/ What am i doing:
+# I calculate the SD for the condition for each participant. Then I compare them, whether they are different. Thus we test, whether the SD (variance=sd^2) is significantly different between conditions within participant.
+```
+```{r}
+# Pitman Morgan: Variance test Between participants
+# Aggregate Data: Calculate mean per condition per participant
+df_mean <- df %>% 
+  group_by(participant_ID, shared_condition_order) %>% 
+  summarise(
+    mean_flow = mean(flow_rating),
+    mean_social_presence = mean(social_presence_rating),
+    mean_affect = mean(panas_rating),
+    .groups = "drop"
+    ) %>% 
+  pivot_wider(names_from = shared_condition_order,
+              values_from = c(mean_flow, mean_social_presence, mean_affect))
+```
+```{r}
+# Pitman-Morgan: Comparing with-ai and without_ai mean, sd between participant
+Var.test(df_mean$mean_flow_without_ai, df_mean$mean_flow_with_ai, paired = TRUE) # Flow
+Var.test(df_mean$mean_social_presence_without_ai, df_mean$mean_social_presence_with_ai, paired = TRUE) # Social Presence
+Var.test(df_mean$mean_affect_without_ai, df_mean$mean_affect_with_ai, paired = TRUE) # Affect
+```
+```{r contrasts}
+# Sum contrasts (±0.5): with_ai = +0.5, without_ai = -0.5
+df$shared_condition_order <- factor(df$shared_condition_order,
+                                    levels = c("with_ai", "without_ai"))
+contrasts(df$shared_condition_order) <- c(0.5, -0.5)
+```
+
+```{r}
+df <- df %>% # Create a col for each condition, to allow different intercepts per condition
+  mutate(
+    condition_hai = as.integer(shared_condition_order == "with_ai"),
+    condition_hh = as.integer(shared_condition_order == "without_ai")
+  )
+```
+```{r}
+df
+```
+# Flow Location Scale Model
+```{r}
+# Homoscedastic version, that only includes location model: Assumes that there is no difference in variability 
+flow_location_model <- brm(
+  bf(flow_rating ~ shared_condition_order + chat_number + shared_prompt_order +
+       (0 + condition_hai + condition_hh | participant_ID) +
+       (1 | dyad_ID)),
+  data   = df,
+  family = gaussian(),
+  cores  = 4,
+  seed   = 42,
+  iter = 4000,
+  control = list(adapt_delta = 0.95),
+  file_refit = "always",
+  file   = "../../Models/flow_location",
+  save_pars = save_pars(all = TRUE)
+)
+
+# Heteroscedastiv version, that includes location and scale model: Directly models variability
+flow_location_scale_model <- brm(
+  bf(flow_rating ~ shared_condition_order + chat_number + shared_prompt_order +
+       (0 + condition_hai + condition_hh | participant_ID) +
+       (1 | dyad_ID),
+     sigma ~ shared_condition_order + (1 | participant_ID)),
+  data   = df,
+  family = gaussian(),
+  cores  = 4,
+  seed   = 42,
+  iter = 4000,
+  control = list(adapt_delta = 0.95),
+  file_refit = "always",
+  file   = "../../Models/flow_location_scale",
+  save_pars = save_pars(all = TRUE)
+)
+```
+```{r}
+# Model comparison: how does gof change when including scale model
+flow_location <- add_criterion(flow_location_model, "loo", moment_match = TRUE, reloo = TRUE)
+flow_location_scale  <- add_criterion(flow_location_scale_model,  "loo", moment_match = TRUE, reloo = TRUE)
+loo_compare(flow_location, flow_location_scale)
+```
+```{r}
+summary(flow_location_scale_model)
+```
+
+
+
+
+
+# Social Presence Location Scale Model
+```{r}
+# Homoscedastic version, that only includes location model: Assumes that there is no difference in variability 
+sp_location_model <- brm(
+  bf(social_presence_rating ~ shared_condition_order + chat_number + shared_prompt_order +
+       (0 + condition_hai + condition_hh | participant_ID) +
+       (1 | dyad_ID)),
+  data   = df,
+  family = gaussian(),
+  cores  = 4,
+  seed   = 42,
+  iter = 4000,
+  control = list(adapt_delta = 0.95),
+  file_refit = "always",
+  file   = "../../Models/sp_location",
+  save_pars = save_pars(all = TRUE)
+)
+
+# Heteroscedastiv version, that includes location and scale model: Directly models variability
+sp_location_scale_model <- brm(
+  bf(social_presence_rating ~ shared_condition_order + chat_number + shared_prompt_order +
+       (0 + condition_hai + condition_hh | participant_ID) +
+       (1 | dyad_ID),
+     sigma ~ shared_condition_order + (1 | participant_ID)),
+  data   = df,
+  family = gaussian(),
+  cores  = 4,
+  seed   = 42,
+  iter = 4000,
+  control = list(adapt_delta = 0.95),
+  file_refit = "always",
+  file   = "../../Models/sp_location_scale",
+  save_pars = save_pars(all = TRUE)
+)
+```
+```{r}
+sp_location <- add_criterion(sp_location_model, "loo", moment_match = TRUE, reloo = TRUE) # Refits the model 9 times to compute ELPDs for probelmatic observations directly, recommended by Warning after running the code without reloo
+sp_location_scale  <- add_criterion(sp_location_scale_model,  "loo", moment_match = TRUE, reloo = TRUE)
+loo_compare(sp_location, sp_location_scale)
+```
+```{r}
+summary(sp_location_scale_model)
+```
+
+
+
+
+
+
+
+# Affect Location Scale Model
+```{r}
+# Homoscedastic version, that only includes location model: Assumes that there is no difference in variability 
+affect_location_model <- brm(
+  bf(panas_rating ~ shared_condition_order + chat_number + shared_prompt_order +
+       (0 + condition_hai + condition_hh | participant_ID) +
+       (1 | dyad_ID)),
+  data   = df,
+  family = gaussian(),
+  cores  = 4,
+  seed   = 42,
+  iter = 4000,
+  control = list(adapt_delta = 0.95),
+  file_refit = "always",
+  file   = "../../Models/affect_location",
+  save_pars = save_pars(all = TRUE)
+)
+
+# Heteroscedastiv version, that includes location and scale model: Directly models variability
+affect_location_scale_model <- brm(
+  bf(panas_rating ~ shared_condition_order + chat_number + shared_prompt_order +
+       (0 + condition_hai + condition_hh | participant_ID) +
+       (1 | dyad_ID),
+     sigma ~ shared_condition_order + (1 | participant_ID)),
+  data   = df,
+  family = gaussian(),
+  cores  = 4,
+  seed   = 42,
+  iter = 4000,
+  control = list(adapt_delta = 0.95),
+  file_refit = "always",
+  file   = "../../Models/affect_location_scale",
+  save_pars = save_pars(all = TRUE)
+)
+```
+```{r}
+options(future.globals.maxSize = 2000 * 1024^2)  # increase to 2 GB, fix model too big
+affect_location <- add_criterion(affect_location_model, "loo", moment_match = TRUE, reloo = TRUE)
+affect_location_scale  <- add_criterion(affect_location_scale_model,  "loo", moment_match = TRUE, reloo = TRUE)
+loo_compare(affect_location, affect_location_scale)
+```
+```{r}
+summary(affect_location_scale_model)
+```
+
+
+
+
