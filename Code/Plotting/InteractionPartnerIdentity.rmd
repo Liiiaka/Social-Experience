@@ -1,0 +1,87 @@
+---
+title: "AI_Detection"
+author: "Annika Richter"
+date: "2026-06-16"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(dplyr)
+```
+
+# How well did participants acutally detect whether they were interacting with a human or an AI chatbot? 
+```{r}
+# Load Interleaf data
+df <- read.csv("../../Data/df_interleaf_measures.csv")
+```
+
+```{r}
+# How many ratings were actually extreme enough, that they can be interpreteted as "confident human" or "confident AI?"
+df <- df %>%
+  mutate(
+    confidence_interaction_partner = case_when(
+      ai_detection_rating <= 30 ~ "human",       # confident "human"
+      ai_detection_rating >= 70 ~ "ai",          # confident "AI"
+      TRUE            ~ "uncertain"     # 26–74, the middle
+    )
+  )
+
+df %>% count(confidence_interaction_partner)
+sum(df$confidence_interaction_partner) == "uncertain")             # How many ratings are uncertain in total? 
+mean(df$confidence_interaction_partner) == "uncertain")            # How many percent of ratings are uncertain? 
+```
+```{r}
+# Truth in certain ratings
+conf <- df %>%
+  filter(band != "uncertain") %>%
+  mutate(
+    truth_ai    = shared_condition_order == "with_ai",
+    response_ai = band == "ai",
+    correct     = response_ai == truth_ai
+  )
+
+mean(conf$correct)                    # overall accuracy on confident judgments
+
+conf %>%                              # split out: better at spotting AI or humans?
+  group_by(shared_condition_order) %>%
+  summarise(n = n(), accuracy = mean(correct))
+```
+
+
+
+```{r}
+# Each person's accuracy vs. 50% chance
+acc_p <- conf %>% group_by(participant) %>% summarise(acc = mean(correct))
+t.test(acc_p$acc, mu = 0.5)
+
+# or model-based, handling clustering
+library(lme4)
+m <- glmer(correct ~ 1 + (1 | participant) + (1 | dyad), data = conf, family = binomial)
+plogis(fixef(m)[["(Intercept)"]])     # accuracy estimate adjusted for clustering
+```
+
+
+```{r}
+acc_p <- conf %>% group_by(participant) %>% summarise(acc = mean(correct))
+t.test(acc_p$acc, mu = 0.5)
+```
+
+
+```{r}
+# Sum Contrasts: Code human-AI as -0.5 and human-human as 0.5
+df$shared_condition_order <- as.factor(as.character(df$shared_condition_order))
+contrasts(df$shared_condition_order) <- c(-0.5, 0.5)
+```
+```{r}
+df
+
+
+0 - 25
+75 - 100
+-> How many does this cover
+-> How many of those are correct? 
+```
+

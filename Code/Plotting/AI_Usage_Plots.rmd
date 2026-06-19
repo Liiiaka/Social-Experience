@@ -1,0 +1,272 @@
+---
+title: "AI_Usage_Plots"
+author: "Annika Richter"
+date: "2026-05-13"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(patchwork)
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+# Load AI Usage data
+df_ai_usage <- read.csv("../../Data/df_ai_usage.csv")
+```
+
+```{r}
+# Colors
+teal <- "#0397b2"
+damped_light_blue <-"#b6e2ff"
+```
+
+```{r}
+# Make the text bigger on all plots
+theme_set(
+  theme_minimal(base_size = 18) +
+    theme(
+      axis.text = element_text(size = 16),   
+      axis.title = element_text(size = 17),  
+      legend.text = element_text(size = 15), 
+      legend.title = element_text(size = 16),
+      plot.tag = element_text(size = 20, face = "bold"), 
+      strip.text = element_text(size = 16)
+    )
+)
+```
+
+```{r}
+# Usage contexts (multi-select)
+df_ai_usage$contexts <- sapply(ai_usage_list, function(x) {
+  paste(unlist(x$usageContexts), collapse = ", ")
+})
+
+# Summary of all measures and values
+print("AI Tools Used")
+print(sort(table(unlist(lapply(ai_usage_list, function(x) unlist(x$general)))), decreasing = TRUE))
+
+print("Usage Frequency")
+print(sort(table(df_ai_usage$frequency), decreasing = TRUE))
+
+print("Prompts Per Session")
+print(sort(table(df_ai_usage$promptsPerSession), decreasing = TRUE))
+
+print("Usage Contexts")
+print(sort(table(unlist(lapply(ai_usage_list, function(x) unlist(x$usageContexts)))), decreasing = TRUE))
+
+print("Using AI Since")
+print(sort(table(df_ai_usage$since), decreasing = TRUE))
+```
+
+```{r}
+# Unlist multiselect data for AI tools
+df_ai_usage$tools <- sapply(ai_usage_list, function(x) {
+  tools <- unlist(x$general)
+  if (!is.null(x$generalOther) && x$generalOther != "") {
+    tools <- c(tools, x$generalOther)
+  }
+  paste(tools, collapse = ", ")
+})
+head(df_ai_usage)
+```
+```{r}
+# AI Tools data: Which AI Tools did participants use? 
+df_ai_tools <- df_ai_usage %>%
+  separate_rows(tools, sep = ", ") %>%
+  count(tools, sort = TRUE)
+df_ai_tools
+```
+```{r}
+# Make a nicer plot?
+p_ai_tools <- df_ai_tools %>% 
+  filter(!is.na(n)) %>%
+  arrange(n) %>%
+  mutate(tools = factor(tools, tools)) %>%
+  ggplot(aes(x = tools, y = n)) +
+  geom_point()+
+  geom_segment( aes(x=tools, xend=tools, y=0, yend=n)) +
+  geom_text(aes(label = n), hjust = -0.5, size = 7, color = "grey30") +
+  labs(x = NULL, y = NULL) +
+  coord_flip()+
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15)))
+
+p_ai_tools
+```
+
+```{r}
+# Usage contexts: Unlist mulitselect data
+df_ai_usage$contexts <- sapply(ai_usage_list, function(x) {
+  paste(unlist(x$usageContexts), collapse = ", ")
+})
+
+# In which contexts are participants using AI tools? 
+df_ai_contexts <- df_ai_usage %>%
+  separate_rows(contexts, sep = ", ") %>%
+  count(contexts, sort = TRUE)
+df_ai_contexts
+```
+```{r}
+# Recode AI contexts to be in english (apa7 guidelines)
+df_ai_contexts <- df_ai_usage %>%
+  separate_rows(contexts, sep = ", ") %>%
+  count(contexts, sort = TRUE) %>%
+  mutate(contexts = recode(contexts,
+    "Persönliches Lernen" = "Personal Learning",
+    "Arbeit"              = "Work",
+    "Kreative Aufgaben"   = "Creative Tasks",
+    "Andere"              = "Other",
+    "Unterhaltung"        = "Entertainment",
+    "Forschung"           = "Research",
+    "Programmierung"      = "Programming"
+  ))
+```
+
+```{r}
+# Plot Contexts
+p_ai_contexts <- df_ai_contexts %>% 
+  filter(!is.na(n)) %>%
+  arrange(n) %>%
+  mutate(contexts = factor(contexts, contexts)) %>%
+  ggplot(aes(x = contexts, y = n)) +
+  geom_point()+
+  geom_segment( aes(x=contexts, xend=contexts, y=0, yend=n)) +
+  geom_text(aes(label = n), hjust = -0.5, size = 7, color = "grey30") +
+  labs(x = NULL, y = NULL) +
+  theme(axis.text.x   = element_blank(),
+        axis.ticks.x  = element_blank())+
+  coord_flip()+
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15)))
+
+p_ai_contexts
+```
+```{r}
+# How frequent to participants use AI Tools?
+# Create Dataset
+df_ai_freq<- df_ai_usage %>%
+  count(frequency, sort = TRUE)
+df_ai_freq
+```
+
+```{r}
+# Create frequency plot
+freq_order <- c("Almost constantly", "6-10 times per day", "3-5 times per day", "1-2 times per day", "Less than once per day", "Not at all")
+shades_bg <- colorRampPalette(c(damped_light_blue, teal))(length(freq_order)) # Create color levels for the different frequencies
+
+p_freq_stacked <- df_ai_freq %>%
+  filter(!is.na(n)) %>%
+  mutate(frequency = factor(frequency, levels = rev(freq_order))) %>%
+  ggplot(aes(x = n, y = "Frequency of Usage", fill = frequency)) +
+  geom_col(position = "fill", width = 0.2) +
+  scale_fill_manual(values = shades_bg) +
+  geom_text(aes(label = n), position = position_fill(vjust = 0.5),
+            size = 6.5, color = "white", fontface="bold") +
+  labs(x = NULL, y = NULL, fill = NULL) +
+  theme(panel.grid = element_blank(),
+        axis.text.x   = element_blank(),
+        axis.ticks  = element_blank())+
+  theme(legend.position = "bottom")+ 
+  theme(legend.box.margin = margin(-50, 20, 0, 0))+ 
+  guides(fill = guide_legend(reverse = TRUE))
+p_freq_stacked
+```
+
+```{r}
+# How many prompts per session
+
+# Create Dataset
+df_ai_prompts<- df_ai_usage %>%
+  filter(promptsPerSession > 0) %>%
+  count(promptsPerSession, sort = TRUE)
+
+df_ai_prompts
+```
+
+```{r}
+df_ai_prompts <- df_ai_usage %>%
+  mutate(promptsPerSession = case_when(is.na(promptsPerSession) | promptsPerSession == 0 ~ "No AI Use", TRUE ~ as.character(promptsPerSession))) %>%
+  count(promptsPerSession, sort = TRUE)
+
+df_ai_prompts
+```
+
+
+```{r}
+# Plot
+ps_order <- c("1-2", "3-5", "6-10", "More than 10") # Prompts per session, order
+shades_ps <- colorRampPalette(c(damped_light_blue, teal))(length(ps_order)) # Create the color categories for the different levels in prompt per session
+
+p_ps_stacked <- df_ai_prompts %>%
+  filter(!is.na(n)) %>%
+  mutate(promptsPerSession = factor(promptsPerSession, levels = ps_order)) %>%
+  ggplot(aes(x = n, y = "Prompts per Session", fill = promptsPerSession)) +
+  geom_col(position = "fill", width = 0.2) +
+  scale_fill_manual(values = shades_ps) +
+  geom_text(aes(label = n), position = position_fill(vjust = 0.5),
+            size = 6.5, color = "white", fontface="bold") +
+  labs(x = NULL, y = NULL, fill = NULL) +
+  theme(panel.grid = element_blank(),
+        axis.text.x   = element_blank(),
+        axis.ticks  = element_blank())+
+  theme(legend.position = "bottom")+ 
+  theme(legend.box.margin = margin(-100, 110, 0, 0))+ 
+  guides(fill = guide_legend(reverse = TRUE))
+p_ps_stacked
+```
+
+```{r}
+# Since when do participant use AI tools?
+# Create Dataset
+df_ai_year<- df_ai_usage %>%
+  count(since, sort = TRUE)
+
+df_ai_year
+```
+```{r}
+# Plot
+p_ai_year <- df_ai_year %>% 
+  ggplot(aes(x = since, y = n)) +
+  geom_bar(stat = "identity", fill = teal, width = 0.3)+
+  geom_text(aes(label = n),vjust = -0.3) +
+  expand_limits(y = max(df_ai_year$n) * 1.1)+
+  ylab(NULL)+
+  xlab(NULL)
+
+p_ai_year
+```
+
+
+```{r}
+# Create a plot that contains A L L results from the AI usage questionnaire
+# (For supervisors: The plot looks distorted in R, because it is optimized for the output pdf version)
+layout <- "
+AABB
+AABB
+AABB
+AABB
+AA##
+AA##
+CCDD
+CCDD
+EEDD
+EEDD"
+
+combined <- p_ai_tools + p_ai_contexts + p_freq_stacked +
+            p_ai_year + p_ps_stacked +
+            plot_layout(design = layout) +
+            plot_annotation(tag_levels = "A")
+
+ggsave("ai_usage_overview.pdf", combined,
+       width = 16, height = 10, dpi = 300, bg = "white", device = pdf)
+
+```
+
+
+
+
+
+

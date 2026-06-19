@@ -1,0 +1,181 @@
+---
+title: "H1a_H2a_H3a_Plots"
+author: "Annika Richter"
+date: "2026-06-16"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(patchwork)
+library(ggplot2)
+library(tidyverse)
+```
+
+```{r}
+# Load Interleaf data
+df <- read.csv("../../Data/df_interleaf_measures.csv")
+```
+
+```{r}
+colnames(df)
+```
+### Plot Ratings
+```{r}
+#Canva Colors
+teal <- "#0397b2"
+damped_light_blue <-"#b6e2ff"
+```
+
+```{r}
+# Global theme — set once, applies to all plots
+theme_set(
+  theme_minimal(base_size = 20) +
+    theme(
+      axis.text        = element_text(size = 18),
+      axis.title       = element_text(size = 19, face = "bold"),
+      legend.text      = element_text(size = 17),
+      legend.title     = element_text(size = 18),
+      strip.text       = element_text(size = 18, face = "bold"),
+      plot.title       = element_text(size = 22, face = "bold", hjust = 0.5)
+    )
+)
+```
+
+
+```{r}
+colors <- c(
+  "with_ai"    = teal,  
+  "without_ai" = damped_light_blue 
+)
+
+ggplot(df, aes(
+    x = shared_condition_order,
+    y = flow_rating,
+    fill = shared_condition_order
+)) +
+  geom_boxplot(linewidth = 0.4, outlier.alpha = 0.6) +
+  scale_fill_manual(values = colors) +
+  scale_x_discrete(labels = c("with_ai" = "human-AI", "without_ai" = "human-human")) +
+  labs(
+    title = NULL,
+    x = NULL,
+    y = "Flow (Self-Report Rating)"
+  ) +
+  theme(
+    legend.position = "none",
+    axis.title = element_text(face = "bold")
+  )
+```
+
+```{r}
+df_mean_cond <- df %>%
+  group_by(chat_number, shared_condition_order) %>%
+  summarise(mean_flow = mean(flow_rating), .groups = "drop")
+
+ggplot(df_mean_cond, aes(x = chat_number, y = mean_flow,
+                         color = shared_condition_order)) +
+  geom_line(size = 0.5) +
+  geom_point(size = 2) +
+  labs(
+    x = "Chat Number",
+    y = "Mean Flow (Self-Report Rating)",
+    color = "Condition",
+    title = NULL
+  ) +
+  scale_color_manual(values = colors) +
+  scale_x_discrete(labels = c("with_ai" = "human-AI", "without_ai" = "human-human")) +
+  scale_x_continuous(
+    breaks = unique(df_mean_cond$chat_number),  
+    minor_breaks = NULL                        
+  ) +
+  scale_y_continuous(
+    limits = c(0, 100),
+    breaks = seq(0, 100, by = 10)            
+  ) 
+```
+### Create a Facet Plot Containing Social Presence, Flow and Panas Rating
+
+
+```{r}
+# 1. Prepare data in long format for plotting
+df_long <- df %>%
+  pivot_longer(
+    cols = c(flow_rating, social_presence_rating, panas_rating),
+    names_to = "measure",
+    values_to = "value"
+  )
+
+df_mean_long <- df_long %>%
+  group_by(chat_number, shared_condition_order, measure) %>%
+  summarise(mean_value = mean(value), .groups = "drop")
+
+# 3. Boxplots (top row)
+p_box <- ggplot(df_long, aes(x = shared_condition_order, y = value, fill = shared_condition_order)) +
+  geom_boxplot(alpha = 0.7, linewidth = 0.4, outlier.alpha = 0.6) +
+  scale_fill_manual(values = colors) +
+  scale_x_discrete(labels = c("with_ai" = "human-AI", "without_ai" = "human-human"))+
+  facet_wrap(~measure, scales = "free_y",
+             labeller = as_labeller(c(
+               flow_rating = "Flow",
+               social_presence_rating = "Social Presence",
+               panas_rating = "Affect"
+             ))) +
+  labs(x = NULL, y = "Rating  (Self-Report)") +
+  theme(
+    legend.position = "none",
+    strip.text = element_text(face = "bold"),
+    axis.title = element_text(face = "bold")
+  )
+
+# 4. Over-time plots (bottom row)
+p_time <- ggplot(df_mean_long, aes(x = chat_number, y = mean_value, color = shared_condition_order)) +
+  geom_line(size = 0.7) +
+  geom_point(size = 2) +
+  scale_color_manual(values = colors, labels = c("human-AI", "human-human")) +
+  facet_wrap(~measure, scales = "free_y",
+             labeller = as_labeller(c(
+               flow_rating = "Flow",
+               social_presence_rating = "Social Presence",
+               panas_rating = "Affect"
+             ))) +
+  scale_x_continuous(
+    breaks = unique(df_mean_long$chat_number),
+    minor_breaks = NULL             
+  ) +
+  scale_y_continuous(
+    limits = c(0, 100),                     
+    breaks = seq(0, 100, by = 10)
+  ) +
+  labs(x = "Chat Number", y = "Mean Rating", color = "Condition") +
+  theme(
+    strip.text = element_text(face = "bold"),
+    axis.title = element_text(face = "bold"),
+    legend.position = "bottom"
+  )
+
+# 5. Combine both rows
+combined_plot <- p_box / p_time + 
+  plot_layout(heights = c(1, 1.2)) + 
+  plot_annotation(
+    title = NULL,
+    theme = theme(plot.title = element_text(face = "bold", size = 16, hjust = 0.5))
+  )
+
+# Print
+combined_plot
+```
+```{r}
+# Save as pdf
+ggsave(
+  filename = "Flow_Panas,SocialPresence_Between_Conditions.pdf",
+  plot = combined_plot,
+  width = 16, 
+  height = 10,
+  dpi = 300,
+  device = pdf
+)
+```
+
