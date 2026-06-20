@@ -1,5 +1,5 @@
 ---
-title: "Main_Analysis"
+title: "Linear Mixed Models (H1a, H2a, H3a)"
 author: "Annika Richter"
 date: "2026-01-18"
 output: pdf_document
@@ -8,18 +8,6 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-# 2. Analysis
-Load Pre-Processed Dataset including the Interleaf measure results
-
-H1 - H3
-Fit Models testing for conditions effects for:
-- Flow
-- Social Presence
-- Affect (PANAS)
-
-Each:
-1. Linear Mixed Model
-
 ```{r}
 # Load libaries
 library(tidyverse)
@@ -31,35 +19,28 @@ library(lme4)
 # Load Interleaf data
 df <- read.csv("../../Data/df_interleaf_measures.csv")
 ```
-```{r}
-# Function to extract residuals from model
-extract_residuals <- function(model, data, condition_var = "shared_condition_order") {
-  data %>%
-    mutate(residual = residuals(model))
-}
-```
 
 ```{r}
-# Sum Contrasts: Code HAI as -0.5 and HH as 0.5
-# What this does: Recode condition order as -0.5 and 0.5, prevents the use of dummy or treatment contrasts, 
-# Interpretation: Slope represents raw difference between conditions, intercept each is the grand mean of the dv in the condition
+# Sum Contrasts: Recode condition order as hai = -0.5 and hh = 0.5
+# Prevents the use of dummy or treatment contrasts, 
+# Interpretation: Slope represents raw difference between conditions
+# Each intercept is the grand mean of the dv in the condition
+```
+```{r}
 df$shared_condition_order <- as.factor(as.character(df$shared_condition_order))
 contrasts(df$shared_condition_order) <- c(-0.5, 0.5)
 ```
 ```{r}
-# Print Contrast Matrix
+# Contrast Matrix
 contrasts(df$shared_condition_order)
 # Check that everything is there and working
 attributes(df$shared_condition_order)
 ```
 
 ```{r}
-#######################################  
-# H1: Flow analysis: H1 (Flow): Participants will report (a) higher Flow in human-human than in human-AI interaction, and (b) Flow will show greater variance in human-human interaction.
-#######################################  
-
 # H1: A Flow model Difference between human-human and human-AI condition
-flow_model <- lmer(flow_rating ~ shared_condition_order + chat_number + shared_prompt_order + 
+flow_model <- lmer(flow_rating ~ shared_condition_order + chat_number + 
+                     shared_prompt_order + 
                    (1 + shared_condition_order | participant_ID) + 
                    (1 | dyad_ID),
                    data = df)
@@ -67,12 +48,9 @@ summary(flow_model)
 ```
 
 ```{r}
-#######################################  
-# H2: Social Presence analysis: H2 (Flow): Participants will report (a) higher Social Presence in human-human than in human-AI interaction, and (b) Social Presence will show greater variance in human-human interaction.
-#######################################  
-
 # H2: A Flow model Difference between human-human and human-AI condition
-social_presence_model <- lmer(social_presence_rating ~ shared_condition_order + chat_number + shared_prompt_order + 
+social_presence_model <- lmer(social_presence_rating ~ shared_condition_order + 
+                                chat_number + shared_prompt_order + 
                    (1 + shared_condition_order | participant_ID) + 
                    (1 | dyad_ID),
                    data = df)
@@ -80,12 +58,9 @@ summary(social_presence_model)
 ```
 
 ```{r}
-#######################################  
-# H3: PANAS analysis: H2 (PANAS): Participants will report (a) higher positive affect in human-human than in human-AI interaction, and (b) Affect will show greater variance in human-human interaction.
-#######################################  
-
 # H3: Affect Difference between human-human and human-AI condition
-panas_model <- lmer(panas_rating ~ shared_condition_order + chat_number + shared_prompt_order + 
+panas_model <- lmer(panas_rating ~ shared_condition_order + chat_number + 
+                      shared_prompt_order + 
                    (1 + shared_condition_order | participant_ID) + 
                    (1 | dyad_ID),
                    data = df)

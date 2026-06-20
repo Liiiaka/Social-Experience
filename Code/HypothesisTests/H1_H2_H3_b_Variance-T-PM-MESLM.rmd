@@ -1,8 +1,10 @@
 ---
-title: "H1_H2_H3_b_Variance-T-MESLM"
+title: "Variability Analysis: MESLM, T-Test, Pitman-Morgan (H1b, H2b, H3b)"
 author: "Annika Richter"
 date: "2026-06-13"
 output: pdf_document
+execute:
+  eval: false
 ---
 
 ```{r setup, include=FALSE}
@@ -13,7 +15,6 @@ library(tidyverse)
 library(PairedData)
 library(brms)
 ```
-
 ```{r}
 # Load Interleaf data
 df <- read.csv("../../Data/df_interleaf_measures.csv")
@@ -41,9 +42,6 @@ head(df_sd)
 t.test(df_sd$sd_flow_without_ai, df_sd$sd_flow_with_ai, paired = TRUE) # Flow
 t.test(df_sd$sd_social_presence_without_ai, df_sd$sd_social_presence_with_ai, paired = TRUE) # Social Presence
 t.test(df_sd$sd_affect_without_ai, df_sd$sd_affect_with_ai, paired = TRUE) # Affect
-
-# Why is this within participant/ What am i doing:
-# I calculate the SD for the condition for each participant. Then I compare them, whether they are different. Thus we test, whether the SD (variance=sd^2) is significantly different between conditions within participant.
 ```
 ```{r}
 # Pitman Morgan: Variance test Between participants
@@ -66,11 +64,18 @@ Var.test(df_mean$mean_social_presence_without_ai, df_mean$mean_social_presence_w
 Var.test(df_mean$mean_affect_without_ai, df_mean$mean_affect_with_ai, paired = TRUE) # Affect
 ```
 ```{r contrasts}
-# Sum contrasts (±0.5): with_ai = +0.5, without_ai = -0.5
+# Sum contrasts: with_ai = -0.5, without_ai = 0.5
 df$shared_condition_order <- factor(df$shared_condition_order,
                                     levels = c("with_ai", "without_ai"))
-contrasts(df$shared_condition_order) <- c(0.5, -0.5)
+contrasts(df$shared_condition_order) <- c(-0.5, 0.5)
 ```
+```{r}
+# Print Contrast Matrix
+contrasts(df$shared_condition_order)
+# Check that everything is there and working
+attributes(df$shared_condition_order)
+```
+
 
 ```{r}
 df <- df %>% # Create a col for each condition, to allow different intercepts per condition
@@ -224,6 +229,9 @@ loo_compare(affect_location, affect_location_scale)
 ```
 ```{r}
 summary(affect_location_scale_model)
+```
+```{r}
+save.image("backup.RData")
 ```
 
 

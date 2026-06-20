@@ -1,5 +1,5 @@
 ---
-title: "H5_Likeability"
+title: "Interpersonal Liking (H5)"
 author: "Annika Richter"
 date: "2026-05-17"
 output: pdf_document
@@ -14,13 +14,7 @@ library(tidyverse)
 library(ggplot2)
 library(lme4)
 library(lmerTest)
-```
-
-```{r}
-#######################################  
-# H5: Likability analysis
-# Likability will modulate flow, social presence and affect in both human-human and human-AI interactions.
-##########################
+library(patchwork)
 ```
 
 ```{r}
@@ -37,8 +31,11 @@ df <- df %>%
 ```
 ```{r}
 # Sum Contrasts: Code HAI as -0.5 and HH as 0.5
-# What this does: Recode condition order as -0.5 and 0.5, prevents the use of dummy or treatment contrasts, 
-# Interpretation: Slope represents raw difference between conditions, intercept each is the grand mean of the dv in the condition
+# What this does: Recode condition order as -0.5 and 0.5
+# prevents the use of dummy contrasts, 
+# Interpretation: Slope represents raw difference between conditions
+# Intercept each is the grand mean of the dv in the condition
+
 df$shared_condition_order <- as.factor(as.character(df$shared_condition_order))
 contrasts(df$shared_condition_order) <- c(-0.5, 0.5)
 ```
@@ -152,7 +149,10 @@ p_panas  <- plot_interaction(pred_panas,  "Predicted Affect")
 interaction_plot <- (p_flow | p_social | p_panas) +
   plot_layout(guides = "collect") &
   theme(legend.position = "bottom")
-
+```
+```{r}
+# Plot is optimized for the pdf output, that is produced by ggsave, not for the 
+# knitted PDF of the R Script!
 interaction_plot
 ```
 ```{r}

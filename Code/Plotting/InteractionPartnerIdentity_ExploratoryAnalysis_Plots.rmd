@@ -1,5 +1,5 @@
 ---
-title: "AI_Detection"
+title: "Interaction Partner Identity Ratings"
 author: "Annika Richter"
 date: "2026-06-16"
 output: pdf_document
@@ -23,65 +23,71 @@ df <- read.csv("../../Data/df_interleaf_measures.csv")
 df <- df %>%
   mutate(
     confidence_interaction_partner = case_when(
-      ai_detection_rating <= 30 ~ "human",       # confident "human"
-      ai_detection_rating >= 70 ~ "ai",          # confident "AI"
+      ai_detection_rating <= 25 ~ "human",       # confident "human"
+      ai_detection_rating >= 75 ~ "ai",          # confident "AI"
       TRUE            ~ "uncertain"     # 26–74, the middle
     )
   )
-
-df %>% count(confidence_interaction_partner)
-sum(df$confidence_interaction_partner) == "uncertain")             # How many ratings are uncertain in total? 
-mean(df$confidence_interaction_partner) == "uncertain")            # How many percent of ratings are uncertain? 
 ```
+
 ```{r}
 # Truth in certain ratings
 conf <- df %>%
-  filter(band != "uncertain") %>%
+  filter(confidence_interaction_partner != "uncertain") %>%
   mutate(
     truth_ai    = shared_condition_order == "with_ai",
-    response_ai = band == "ai",
+    response_ai = confidence_interaction_partner == "ai",
     correct     = response_ai == truth_ai
   )
 
-mean(conf$correct)                    # overall accuracy on confident judgments
+mean(conf$correct) # overall accuracy on confident judgments
 
-conf %>%                              # split out: better at spotting AI or humans?
+conf %>% # split out: better at spotting AI or humans?
   group_by(shared_condition_order) %>%
   summarise(n = n(), accuracy = mean(correct))
 ```
 
-
-
 ```{r}
-# Each person's accuracy vs. 50% chance
-acc_p <- conf %>% group_by(participant) %>% summarise(acc = mean(correct))
-t.test(acc_p$acc, mu = 0.5)
+library(ggplot2)
+library(tidyverse)
 
-# or model-based, handling clustering
-library(lme4)
-m <- glmer(correct ~ 1 + (1 | participant) + (1 | dyad), data = conf, family = binomial)
-plogis(fixef(m)[["(Intercept)"]])     # accuracy estimate adjusted for clustering
+teal <- "#0397b2"
+damped_light_blue <- "#b6e2ff"
+
+colors <- c("with_ai" = teal, "without_ai" = damped_light_blue)
 ```
 
-
 ```{r}
-acc_p <- conf %>% group_by(participant) %>% summarise(acc = mean(correct))
-t.test(acc_p$acc, mu = 0.5)
+p_ai_detection <- df %>%
+  ggplot(aes(x = ai_detection_rating, 
+             y = shared_condition_order)) +
+  geom_jitter(aes(color = shared_condition_order), 
+              height = 0.15, size = 2.5, alpha = 0.6) +
+  geom_vline(xintercept = 0, linetype = "dotted", color = "black", linewidth = 0.5) +
+  geom_vline(xintercept = 100, linetype = "dotted", color = "black", linewidth = 0.5) +
+  geom_vline(xintercept = 25, linetype = "dotted", color = "black", linewidth = 0.5) +
+  geom_vline(xintercept = 75, linetype = "dotted", color = "black", linewidth = 0.5) +
+  scale_color_manual(values = colors) +
+  scale_x_continuous(
+    limits = c(-1, 105),
+    breaks = c(0, 25, 75, 100),
+    labels = c("Definitely\nHuman", "25", "75", "Definitely\nAI")
+  ) +
+  scale_y_discrete(labels = c("with_ai" = "human-AI", "without_ai" = "human-human"),
+                   expand = expansion(add = 0.8)) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 18) +
+  theme(
+    axis.text = element_text(size = 16, color = "black"),
+    legend.position = "none",
+    panel.grid = element_blank(),
+    axis.line.x = element_line(color = "black"),
+    axis.ticks.x = element_line(color = "black")
+  )
+
+p_ai_detection
 ```
-
-
 ```{r}
-# Sum Contrasts: Code human-AI as -0.5 and human-human as 0.5
-df$shared_condition_order <- as.factor(as.character(df$shared_condition_order))
-contrasts(df$shared_condition_order) <- c(-0.5, 0.5)
+ggsave("ai_detection_plot.pdf", p_ai_detection,
+       width = 10, height = 4, dpi = 300, bg = "white", device = pdf)
 ```
-```{r}
-df
-
-
-0 - 25
-75 - 100
--> How many does this cover
--> How many of those are correct? 
-```
-
